@@ -1,13 +1,12 @@
-# PHP Cli Progress Bar
-Simple progress bar for php cli
+<?php
+// only terminal
+if (php_sapi_name() !== 'cli') {
+    die('Non CLI');
+};
 
-![php cli progress bar example](demo.gif)
+require_once(dirname(__FILE__) . '/progress.class.php');
 
-## Usage
-
-```php
-$tasks = 5; // total tasks to run
-
+$tasks = 5;
 $progress = new Progress("progress bar demo", $tasks);
 
 for ($i = 0; $i < $tasks; $i++) {
@@ -19,4 +18,3 @@ for ($i = 0; $i < $tasks; $i++) {
 }
 
 $progress->end();
-```

@@ -18,21 +18,24 @@ class Progress {
     // Progress bar name
     private $name;
 
+    // Track whether a progress line has been rendered
+    private $rendered = false;
+
     public function __construct( $name, $tasks, $processed = 0 ) {
         $this->start = microtime(true);
         $this->name = $name;
-        $this->tasks = $tasks;
-        $this->processed = $processed;
+        $this->tasks = max(0, (int)$tasks);
+        $this->processed = min(max(0, (int)$processed), $this->tasks);
         $this->render();
     }
 
     public function increase( $increment = 1 ) {
         if ($this->processed < $this->tasks) {
-            $this->processed = min($this->processed + $increment, $this->tasks);
+            $this->processed = min($this->processed + (int)$increment, $this->tasks);
             $this->render();
         }
         else {
-            fwrite( STDOUT, PHP_EOL );
+            $this->newline();
         }
     }
 
@@ -48,21 +51,22 @@ class Progress {
 
     public function end( $show = true, $beer = true ) {
         $this->end = microtime(true);
+        $this->newline();
         if ($show) {
-            fwrite(STDOUT, "\n");
-            fwrite(STDOUT, PHP_EOL);
-
             if ($beer) {
                 fwrite(STDOUT, "\xF0\x9F\x8D\xBA ");
             }
 
             fwrite(STDOUT, "END {$this->name}" . PHP_EOL);
         }
-        fwrite(STDOUT, "\n");
+        fwrite(STDOUT, PHP_EOL);
     }
 
     private function map( $value, $fromLow, $fromHigh, $toLow, $toHigh ) {
         $fromRange = $fromHigh - $fromLow;
+        if ($fromRange == 0) {
+            return $toHigh;
+        }
         $toRange = $toHigh - $toLow;
         $scaleFactor = $toRange / $fromRange;
 
@@ -74,22 +78,26 @@ class Progress {
         return $tmpValue + $toLow;
     }
 
+    private function newline() {
+        if ($this->rendered) {
+            fwrite(STDOUT, PHP_EOL);
+            $this->rendered = false;
+        }
+    }
+
     private function render() {
-        // Save position
-        fwrite( STDOUT, "\0337" );
-
-        // Restore position
-        fwrite( STDERR, "\0338" );
-
-        $step = (int)$this->map($this->processed, 0, $this->tasks, 0, $this->size);
-        $progress = min((int)($this->processed * 100 / $this->tasks), 100);
+        $step = (int)$this->map($this->processed, 0, max($this->tasks, 1), 0, $this->size);
+        if ($this->tasks === 0) {
+            $progress = 100;
+        } else {
+            $progress = min((int)($this->processed * 100 / $this->tasks), 100);
+        }
         $progress = str_pad($progress, 3, ' ', STR_PAD_LEFT);
 
         // Write progress bar
-        fwrite( STDERR, "[\033[32m" . str_repeat('#', $step) . str_repeat('·', $this->size - $step) . "\033[0m]" );
-        fwrite( STDOUT, " {$progress}% Complete - {$this->name} - {$this->processed}/{$this->tasks} - {$this->elapsed()}" . PHP_EOL );
-
-        // Move up, undo the PHP_EOL
-        fwrite( STDERR, "\033[1A" );
+        $line = "[\033[32m" . str_repeat('#', $step) . str_repeat('·', $this->size - $step) . "\033[0m]";
+        $line .= " {$progress}% Complete - {$this->name} - {$this->processed}/{$this->tasks} - {$this->elapsed()}";
+        fwrite(STDOUT, "\r" . $line);
+        $this->rendered = true;
     }
 }
